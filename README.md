@@ -1,5 +1,7 @@
 # InvestmentApp
 
+[![tests](https://github.com/alestoman5/InvestmentApp/actions/workflows/tests.yml/badge.svg)](https://github.com/alestoman5/InvestmentApp/actions/workflows/tests.yml)
+
 A desktop app for screening S&P 500 stocks on fundamentals and backtesting portfolio strategies against real historical prices.
 
 Pick a quarter, filter the index down with valuation/debt/efficiency criteria, choose a strategy, and see how that basket would have performed — equity curve plus six performance and risk statistics.
@@ -20,8 +22,8 @@ Pick a quarter, filter the index down with valuation/debt/efficiency criteria, c
 Requires **Python 3.10+** (developed and tested on 3.13).
 
 ```bash
-git clone https://github.com/alestoman5/InvestmentApp-main.git
-cd InvestmentApp-main
+git clone https://github.com/alestoman5/InvestmentApp.git
+cd InvestmentApp
 pip install -r requirements.txt
 ```
 
@@ -47,6 +49,39 @@ Then:
 4. Click **Run**.
 
 Tickers that pass the screen on the start quarter are downloaded from Yahoo Finance for the full period, the strategy is simulated over them, and the chart plus statistics update in place.
+
+### Headless mode (no GUI, no fundamentals CSV)
+
+`examples/run_backtest.py` runs every registered strategy on tickers you pass directly and saves an equity-curve chart plus a Markdown statistics table to `examples/output/`:
+
+```bash
+python examples/run_backtest.py AAPL MSFT JNJ PG XOM --start 2015-01-01 --end 2023-06-30
+python examples/run_backtest.py --synthetic   # offline demo, deterministic
+```
+
+## Sample result
+
+Output of `python examples/run_backtest.py --synthetic`: five synthetic stocks (geometric Brownian motion, seed 42), 2015-01-01 – 2023-06-30. **These are simulated prices that illustrate the output format, not market data.**
+
+| Metric | Buy and Hold | Periodic Rebalance |
+| --- | ---: | ---: |
+| Total return (%) | 71.75 | 62.95 |
+| Annualized return (%) | 6.58 | 5.92 |
+| Volatility, ann. (%) | 14.36 | 12.89 |
+| Max drawdown (%) | -29.70 | -30.05 |
+| Sharpe ratio (rf = 2%) | 0.32 | 0.30 |
+| Monthly win rate (%) | 47.52 | 52.48 |
+
+![Sample equity curve](examples/output/equity_curve.png)
+
+## Testing
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+The suite (31 tests, about one second) runs fully offline: yfinance and the price fetcher are mocked. It covers the statistics (returns, drawdown, Sharpe, win rate), the screener's filters and missing-value handling, both strategies against hand-computed portfolio values, the yfinance response formatter and the price cache. GitHub Actions runs it on Python 3.10 and 3.13 for every push and pull request.
 
 ## Data
 
@@ -88,6 +123,8 @@ Price data is cached in memory per `(ticker, start, end)` for the lifetime of th
 | `data/` | yfinance download, response normalization, and the in-memory price cache |
 | `strategies/` | Strategy base class and registry, concrete strategies, statistics, plotting |
 | `utils/` | Configuration constants, the CSV data provider, and the stock screener |
+| `examples/` | Headless command-line backtest and its sample output |
+| `tests/` | Offline pytest suite |
 
 `main.py` wires the pieces together explicitly — CSV provider → screener → GUI — so each layer can be swapped or tested independently. `DataProviderBase` in `utils/data_provider.py` is an abstract interface, so the CSV backing store can be replaced with a database or API without touching the screener.
 
@@ -135,7 +172,6 @@ It will appear automatically in the strategy selector. See `strategies/buy_and_h
 - **The reference dataset carries survivorship bias** — it reflects index membership as compiled, not as it stood in each historical quarter.
 - **No transaction costs, slippage, taxes, or dividends** are modelled. Returns are price-only.
 - **The Sharpe ratio assumes a flat 2% risk-free rate**, hardcoded in `strategies/stats_calculator.py`.
-- **No test suite yet.** `StockScreener.filter_stocks` and `StatsCalculator.calculate` are both pure functions and would be the natural place to start.
 
 ## Disclaimer
 
